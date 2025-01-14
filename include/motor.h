@@ -6,7 +6,6 @@
 */
 
 #pragma once
-#include <AFMotor.h>
 
 AF_DCMotor leftMotor(1);
 AF_DCMotor rightMotor(2);

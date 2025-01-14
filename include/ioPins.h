@@ -6,3 +6,11 @@
 
 #define SWITCH 52
 #define seat 53
+
+inline void ioPinsSetup()
+{
+  pinMode(x_axis, INPUT);
+  pinMode(y_axis, INPUT);
+  pinMode(seat, OUTPUT);
+  pinMode(SWITCH, INPUT_PULLUP);
+}
