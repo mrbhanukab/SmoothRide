@@ -54,5 +54,5 @@ inline JoyStick readJoyStick()
 
 inline bool readSwitch()
 {
-    return digitalRead(SWITCH);
+    return !digitalRead(SWITCH);
 }
