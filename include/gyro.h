@@ -1,128 +1,70 @@
 #pragma once
 
-// MPU6050 I2C Address
-#define MPU6050_ADDRESS 0x68
-// Register Addresses
-#define GYRO_DATA_START 0x43
-#define ACCEL_DATA_START 0x3B
-// Scaling Factors
-#define GYRO_SENSITIVITY 131.0f
-#define ACCEL_SENSITIVITY 16384.0f
-#define PI 3.14159265358979323846f
+Adafruit_MPU6050 mpu;
 
-// Struct to Hold Sensor Data
-struct SensorReadings
+// Variables to store accelerometer calibration offsets
+float accelOffsetX = 0.0;
+float accelOffsetY = 0.0;
+float accelOffsetZ = 0.0;
+
+inline void initializeMPU6050()
 {
-  float x, y, z;
-
-  SensorReadings& operator+=(const SensorReadings& other)
+  if (!mpu.begin())
   {
-    x += other.x;
-    y += other.y;
-    z += other.z;
-    return *this;
+    Serial.println("Failed to find MPU6050 chip");
+    while (1)
+      delay(10);
+  }
+  // set accelerometer range to +-8G
+  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+
+  // set gyro range to +- 500 deg/s
+  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+
+  // set filter bandwidth to 21 Hz
+  mpu.setFilterBandwidth(MPU6050_BAND_44_HZ);
+
+  delay(100);
+}
+
+inline void calibrateAccelerometer()
+{
+  float sumX = 0.0;
+  float sumY = 0.0;
+  float sumZ = 0.0;
+  const int numReadings = 100;
+
+  for (int i = 0; i < numReadings; i++)
+  {
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+    sumX += a.acceleration.x;
+    sumY += a.acceleration.y;
+    sumZ += a.acceleration.z;
+    delay(10);
   }
 
-  SensorReadings operator-(const SensorReadings& other) const
-  {
-    return {x - other.x, y - other.y, z - other.z};
-  }
-};
+  accelOffsetX = sumX / numReadings;
+  accelOffsetY = sumY / numReadings;
+  accelOffsetZ = sumZ / numReadings;
 
-// Global Variables for Calibration Errors and Angle Tracking
-SensorReadings gyroCalibrationError = {0, 0, 0};
-SensorReadings accelCalibrationError = {0, 0, 0};
-SensorReadings currentAngle = {0, 0, 0};
-
-// Function to Initialize the MPU6050
-void initializeMPU6050()
-{
-  Wire.begin();
-  Wire.beginTransmission(MPU6050_ADDRESS);
-  Wire.write(0x6B); // Power management register
-  Wire.write(0x00); // Wake up MPU6050
-  Wire.endTransmission(true);
+  // Adjust Z offset to account for gravity
+  accelOffsetZ -= 9.81; // Subtract gravitational acceleration (m/s^2)
 }
 
-// Function to Read Gyroscope Data
-SensorReadings readGyroscopeData()
+inline int pitch()
 {
-  Wire.beginTransmission(MPU6050_ADDRESS);
-  Wire.write(GYRO_DATA_START);
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU6050_ADDRESS, 6, true);
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
 
-  SensorReadings gyroData;
-  gyroData.x = (Wire.read() << 8 | Wire.read()) / GYRO_SENSITIVITY;
-  gyroData.y = (Wire.read() << 8 | Wire.read()) / GYRO_SENSITIVITY;
-  gyroData.z = (Wire.read() << 8 | Wire.read()) / GYRO_SENSITIVITY;
-  return gyroData;
-}
+  // Apply calibration offsets
+  a.acceleration.x -= accelOffsetX;
+  a.acceleration.y -= accelOffsetY;
+  a.acceleration.z -= accelOffsetZ;
 
-// Function to Read Accelerometer Data
-SensorReadings readAccelerometerData()
-{
-  Wire.beginTransmission(MPU6050_ADDRESS);
-  Wire.write(ACCEL_DATA_START);
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU6050_ADDRESS, 6, true);
+  // Calculate pitch angle in degrees
+  float pitch = atan2(a.acceleration.y,
+                      sqrt(a.acceleration.x * a.acceleration.x + a.acceleration.z * a.acceleration.z)) * 180.0 / PI;
 
-  SensorReadings accelData;
-  accelData.x = (Wire.read() << 8 | Wire.read()) / ACCEL_SENSITIVITY;
-  accelData.y = (Wire.read() << 8 | Wire.read()) / ACCEL_SENSITIVITY;
-  accelData.z = (Wire.read() << 8 | Wire.read()) / ACCEL_SENSITIVITY;
-  return accelData;
-}
-
-// Function to Calibrate Sensors
-void calibrateSensors()
-{
-  const int calibrationReadings = 500;
-  for (int i = 0; i < calibrationReadings; i++)
-  {
-    gyroCalibrationError += readGyroscopeData();
-    accelCalibrationError += readAccelerometerData();
-    delay(3); // Stabilize readings
-  }
-
-  gyroCalibrationError.x /= calibrationReadings;
-  gyroCalibrationError.y /= calibrationReadings;
-  gyroCalibrationError.z /= calibrationReadings;
-
-  accelCalibrationError.x /= calibrationReadings;
-  accelCalibrationError.y /= calibrationReadings;
-  accelCalibrationError.z /= calibrationReadings;
-}
-
-// Function to Calculate Angles from Accelerometer Data
-SensorReadings calculateAccelerometerAngles(const SensorReadings& accelData)
-{
-  SensorReadings angles;
-  angles.x = atan2f(accelData.y, sqrtf(accelData.x * accelData.x + accelData.z * accelData.z)) * 180 / PI;
-  angles.y = atan2f(-accelData.x, sqrtf(accelData.y * accelData.y + accelData.z * accelData.z)) * 180 / PI;
-  angles.z = 0; // Accelerometer does not provide meaningful Z-axis angle
-  return angles;
-}
-
-// Function to Get Filtered Orientation Data
-SensorReadings getFilteredOrientation()
-{
-  static unsigned long lastUpdateTime = 0;
-  unsigned long currentTime = micros();
-  float deltaTime = (currentTime - lastUpdateTime) / 1000000.0f; // Convert to seconds
-  lastUpdateTime = currentTime;
-
-  // Read Raw Sensor Data
-  SensorReadings rawGyroData = readGyroscopeData() - gyroCalibrationError;
-  SensorReadings rawAccelData = readAccelerometerData();
-
-  // Compute Accelerometer Angles
-  SensorReadings accelAngles = calculateAccelerometerAngles(rawAccelData);
-
-  // Apply Complementary Filter
-  currentAngle.x = 0.96f * (currentAngle.x + rawGyroData.x * deltaTime) + 0.04f * accelAngles.x;
-  currentAngle.y = 0.96f * (currentAngle.y + rawGyroData.y * deltaTime) + 0.04f * accelAngles.y;
-  currentAngle.z += rawGyroData.z * deltaTime;
-
-  return currentAngle;
+  return static_cast<int>(pitch);
 }

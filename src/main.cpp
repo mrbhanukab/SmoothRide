@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <AFMotor.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
 #include <Wire.h>
+#include <Servo.h>
 
 #include "ioPins.h"
 #include "joyStick.h"
@@ -11,10 +14,13 @@
 unsigned long previousMillisJoystick = 0, previousMillisSwitch = 0, previousMillisGyro = 0;
 
 void setup() {
+Wire.begin();
     ioPinsSetup();
    Serial.begin(9600);
+   myservo.attach(10);
+   myservo.write(90);
    initializeMPU6050();
-   calibrateSensors();
+   calibrateAccelerometer();
 }
 
 void loop() {
@@ -37,14 +43,8 @@ void loop() {
       seatRotateStop();
 
     //? Task: Read Gyroscope Values & Control Seat
-   if (currentMillis - previousMillisGyro >= 1000) {
-         SensorReadings current = getFilteredOrientation();
-         Serial.print("X: ");
-         Serial.print(current.x);
-          Serial.print(" | Y: ");
-         Serial.print(current.y);
-        Serial.print("  | Z: ");
-         Serial.println(current.z);
+   if (currentMillis - previousMillisGyro >= 10) {
+        adjustSeatAngle(pitch());
          previousMillisGyro = currentMillis;
    }
 
