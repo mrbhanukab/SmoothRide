@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <AFMotor.h>
 #include "ioPins.h"
 #include "seat.h"
 #include "joyStick.h"
@@ -18,6 +17,7 @@ void loop() {
        if (currentMillis - previousMillisJoystick >= 100) {
           previousMillisJoystick = currentMillis;
           JoyStick joyStick = readJoyStick();
+		  motor(joyStick);
        }
 
        if (currentMillis - previousMillisSwitch >= 100 && seatState == false && readSwitch()) {
@@ -29,3 +29,4 @@ void loop() {
           seatRotateStop();
 
 }
+
