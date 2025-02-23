@@ -4,10 +4,13 @@
 #define x_axis A15
 #define y_axis A14
 
-#define forward 30
-#define backward 31
-#define left 34
-#define right 35
+#define leftForward 26
+#define leftBackward 28
+#define leftOn 30
+
+#define rightForward 27
+#define rightBackward 29
+#define rightOn 31
 
 #define SWITCH 52
 #define seat 53
@@ -16,10 +19,15 @@ inline void ioPinsSetup()
 {
   pinMode(x_axis, INPUT);
   pinMode(y_axis, INPUT);
-  pinMode(forward, OUTPUT);
-  pinMode(backward, OUTPUT);
-  pinMode(left, OUTPUT);
-  pinMode(right, OUTPUT);
+
+  pinMode(leftForward, OUTPUT);
+  pinMode(leftBackward, OUTPUT);
+  pinMode(leftOn, OUTPUT);
+
+  pinMode(rightForward, OUTPUT);
+  pinMode(rightBackward, OUTPUT);
+  pinMode(rightOn, OUTPUT);
+
   pinMode(seat, OUTPUT);
   pinMode(SWITCH, INPUT_PULLUP);
 }
